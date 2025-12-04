@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -33,11 +34,27 @@ struct Point {
 //   - playmode: modo de juego (before_kick_off, play_on, etc.) en el init.
 //   - position: posición inicial deseada en el campo (x, y).
 // ---------------------------------------------------------------------------
+
+struct ObjectInfo {
+    double distance;
+    double direction;
+    bool seen{false};
+    char side; // puede sobrar
+};
+
+struct World {
+    ObjectInfo ball;
+    ObjectInfo goal_l;
+    ObjectInfo goal_r;
+    // vector<Player> players;
+};
+
 struct Player {
     char side{'?'};
     int number{-1};
     string playmode;
     Point position;  // posición inicial que nosotros decidimos para él
+    World world;
 
     // -----------------------------------------------------------------------
     // parse_init_msg
@@ -187,6 +204,102 @@ void place_initial_position(Player &player,
     udp_socket.sendTo(move_cmd, server_udp);
 }
 
+void skip_spaces(std::string_view& in) {
+    while (!in.empty() && std::isspace(in.front()))
+        in.remove_prefix(1);
+}
+
+bool consume_char(std::string_view& in, char c) {
+    if (!in.empty() && in.front() == c) {
+        in.remove_prefix(1);
+        return true;
+    }
+    return false;
+}
+
+bool consume_literal(std::string_view& in, std::string_view lit) {
+    if (in.substr(0, lit.size()) == lit) {
+        in.remove_prefix(lit.size());
+        return true;
+    }
+    return false;
+}
+
+bool parse_number(std::string_view& in, double& out) {
+    skip_spaces(in);
+    size_t i = 0;
+
+    // detectar parte del número
+    while (i < in.size() && (isdigit(in[i]) || in[i]=='+' || in[i]=='-' || in[i]=='.'))
+        i++;
+
+    if (i == 0) return false;
+
+    std::string temp(in.substr(0, i));  // copia mínima solo del número
+    out = std::stod(temp);
+    in.remove_prefix(i);
+    return true;
+}
+
+
+void parse_see_msg(std::string_view &msg, World &world){
+    if(msg.find("(b)")){
+        cout << "Entra" << endl;
+        // EJEMPLO: (ball 20 -10))
+        double dist, dir;
+        consume_literal(msg, "(b) ");
+        cout << "Mensaje tras quitar (b)" << msg << endl;
+        parse_number(msg, dist);
+        skip_spaces(msg);
+        parse_number(msg, dir);
+
+        world.ball.distance = dist;
+        world.ball.direction = dir;
+        world.ball.seen = true;
+    } else if(msg.find("(g")) {
+
+    }
+}
+
+void handle_msg(std::string_view &msg, Player p) {
+    if(msg.find("(see")) {
+        // EJEMPLO: (see 10 ((b) 20 -10))
+        double time;
+        consume_literal(msg, "(see ");
+        parse_number(msg, time);
+        skip_spaces(msg);
+        parse_see_msg(msg, p.world);
+    }
+    // else if(msg.find("(sense_body"))
+    //     parse_sense_msg(msg);
+}
+
+// void parse_sense_msg(std::string_view &msg){
+//     // EJEMPLO: ()
+// }
+
+string decide_action(const Player& player) {
+    //¿Veo el balón?
+    if (!player.world.ball.seen) {
+        return ""; // no hacer nada
+    }
+    // 2) Si el balón está desviado más de 5°, girar hacia él
+    if (abs(player.world.ball.direction) > 5.0) {
+        double turn_value = player.world.ball.direction;
+        if (turn_value > 60) turn_value = 60;
+        if (turn_value < -60) turn_value = -60;
+        return "(turn " + to_string(turn_value) + ")";
+    }
+
+    // 3) Si estoy cerca del balón (< 0.7 m), chutar
+    if (player.world.ball.distance < 0.7) {
+        return "(kick 100 0)";
+    }
+
+    // 4) En cualquier otro caso, correr hacia él
+    return "(dash 80)";
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -294,8 +407,30 @@ int main(int argc, char *argv[])
     // Mantenemos el proceso vivo para poder ver al jugador en el monitor
     // y para que posteriormente puedas añadir el bucle Sense-Think-Act.
     // -----------------------------------------------------------------------
-    cout << "Introduce un número para terminar el proceso: ";
-    int a; cin >> a;
+    while(true) {
+        // SENSE
+        // Recibir mensaje
+        auto received_message = udp_socket.receive(message_max_size);
+
+        if (!received_message) {
+            cerr << "Error receiving message from server" << endl;
+            return 1;
+        }
+
+        std::string_view received_message_content = received_message->received_message;
+        cout << "Received message: " << received_message_content << endl;
+
+        // Manejar mensaje
+        handle_msg(received_message_content, player);
+        
+
+        // Think
+        string action = decide_action(player);
+        cout << "Accion pensada: " << action << endl;
+
+        // Act
+        udp_socket.sendTo(action, server_udp);
+    }
 
     return 0;
 }
