@@ -46,6 +46,7 @@ struct World {
     ObjectInfo ball;
     ObjectInfo goal_l;
     ObjectInfo goal_r;
+    bool valid_see{false}; // NUEVO: indica si el último mensaje era un (see ...)
     // vector<Player> players;
 };
 
@@ -242,64 +243,75 @@ bool parse_number(std::string_view& in, double& out) {
 }
 
 
-void parse_see_msg(std::string_view &msg, World &world){
-    if(msg.find("(b)")){
-        cout << "Entra" << endl;
-        // EJEMPLO: (ball 20 -10))
-        double dist, dir;
-        consume_literal(msg, "(b) ");
-        cout << "Mensaje tras quitar (b)" << msg << endl;
-        parse_number(msg, dist);
-        skip_spaces(msg);
-        parse_number(msg, dir);
+void parse_see_msg(std::string_view &msg, World &world) {
+    world.ball.seen = false; // resetear cada ciclo
 
-        world.ball.distance = dist;
-        world.ball.direction = dir;
-        world.ball.seen = true;
-    } else if(msg.find("(g")) {
+    size_t pos = msg.find("(b)");
+    if (pos == std::string::npos) return; // no hay balón
 
-    }
+    msg.remove_prefix(pos + 3); // avanzar tras "(b)"
+
+    double dist = 0, dir = 0;
+    parse_number(msg, dist);
+    parse_number(msg, dir);
+
+    world.ball.distance  = dist;
+    world.ball.direction = dir;
+    world.ball.seen      = true;
+
+    cout << "[DEBUG] Ball detected: dist=" << dist << " dir=" << dir << endl;
 }
 
-void handle_msg(std::string_view &msg, Player p) {
-    if(msg.find("(see")) {
-        // EJEMPLO: (see 10 ((b) 20 -10))
-        double time;
-        consume_literal(msg, "(see ");
-        parse_number(msg, time);
-        skip_spaces(msg);
-        parse_see_msg(msg, p.world);
+void handle_msg(std::string_view &msg, Player &p)
+{
+    if (!msg.starts_with("(see ")) {
+        p.world.valid_see = false; // no es see, no enviamos acción
+        return;
     }
-    // else if(msg.find("(sense_body"))
-    //     parse_sense_msg(msg);
-}
 
-// void parse_sense_msg(std::string_view &msg){
-//     // EJEMPLO: ()
-// }
+    p.world.valid_see = true; // mensaje see válido
+
+    // Saltar "(see "
+    msg.remove_prefix(5);
+
+    double time;
+    parse_number(msg, time);   // Consumimos el tiempo
+    skip_spaces(msg);
+
+    parse_see_msg(msg, p.world);   // Buscar el balón
+}
 
 string decide_action(const Player& player) {
-    //¿Veo el balón?
-    if (!player.world.ball.seen) {
-        return ""; // no hacer nada
-    }
-    // 2) Si el balón está desviado más de 5°, girar hacia él
-    if (abs(player.world.ball.direction) > 5.0) {
-        double turn_value = player.world.ball.direction;
-        if (turn_value > 60) turn_value = 60;
-        if (turn_value < -60) turn_value = -60;
-        return "(turn " + to_string(turn_value) + ")";
+    //if (!player.world.ball.seen) return "(turn 30)"; //No puedes enviar acciones (turn/dash/kick) antes de recibir un (see …) válido.
+
+    if (!player.world.valid_see)
+        return "";  // no enviamos acción hasta recibir un see válido
+
+    if (!player.world.ball.seen)
+        return "(turn 60)";
+
+    double dist = player.world.ball.distance;
+    double dir  = player.world.ball.direction;
+
+    cout << "[DEBUG] dist=" << dist << " dir=" << dir << endl;
+
+    // Limitar giro
+    if (dir > 60) dir = 60;
+    if (dir < -60) dir = -60;
+
+    // Si la dirección es grande, girar primero
+    if (abs(dir) > 10) {   // mayor umbral para evitar girar sin fin
+        return "(turn " + to_string(dir) + ")";
     }
 
-    // 3) Si estoy cerca del balón (< 0.7 m), chutar
-    if (player.world.ball.distance < 0.7) {
+    // Si estamos cerca, chutar
+    if (dist < 3.0) {
         return "(kick 100 0)";
     }
 
-    // 4) En cualquier otro caso, correr hacia él
+    // Si estamos alineados y lejos, avanzar
     return "(dash 80)";
 }
-
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -417,19 +429,23 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        std::string_view received_message_content = received_message->received_message;
+        std::string received_str = received_message->received_message; // copia segura
+        std::string_view received_message_content = received_str;
         cout << "Received message: " << received_message_content << endl;
 
         // Manejar mensaje
+        player.world.ball.seen = false; // fuerza a detectar balón en cada ciclo
         handle_msg(received_message_content, player);
         
 
         // Think
+        
         string action = decide_action(player);
         cout << "Accion pensada: " << action << endl;
 
         // Act
         udp_socket.sendTo(action, server_udp);
+
     }
 
     return 0;
