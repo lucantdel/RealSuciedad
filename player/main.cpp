@@ -305,7 +305,7 @@ string decide_action(const Player& player) {
     }
 
     // Si estamos cerca, chutar
-    if (dist < 3.0) {
+    if (dist <= 0.7) {
         return "(kick 100 0)";
     }
 
