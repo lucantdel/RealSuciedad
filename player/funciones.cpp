@@ -8,6 +8,19 @@
 #include <MinimalSocket/udp/UdpSocket.h>
 #include <iostream>
 #include <cmath>
+#include <map>
+
+// Definición real
+std::map<std::string, Point> FLAG_POSITIONS = {
+    {"f c",      {0, 0}},
+    {"f c t",    {0, 34}},
+    {"f c b",    {0, -34}},
+    {"f r t",    {52.5, 34}},
+    {"f r b",    {52.5, -34}},
+    {"f l t",    {-52.5, 34}},
+    {"f l b",    {-52.5, -34}},
+    // Resto de flags...
+};
 
 // ---- IMPLEMENTACIONES DE OPERADORES ----
 
@@ -215,6 +228,68 @@ void parseSeeMsg(const std::string &msg, PlayerInfo &player)
 void parseSenseMsg(const std::string &msg, PlayerInfo &player)
 {
     // TODO: Implementar parsing completo de sense_body
+}
+
+// Función para parsear las flags de un mensaje "see"
+std::vector<FlagInfo> parseVisibleFlags(const std::string &seeMsg) {
+    std::vector<FlagInfo> visibleFlags;
+    std::string_view sv = seeMsg;
+
+    nextToken(sv); // Saltar "(see"
+    nextToken(sv); // Saltar tiempo
+
+    while (!sv.empty()) {
+    auto tok = nextToken(sv);
+    if (tok.empty()) break;
+
+        // Detectar si es una flag (empieza con f o g o b)
+        std::string flagName(tok);
+        if (tok == "f" || tok == "g" || tok == "b") {
+            // mirar siguiente token para completar nombre
+            auto nextTok = nextToken(sv);
+            if (!nextTok.empty() && nextTok != ")") {
+                flagName += " " + std::string(nextTok);
+                // para flags de 3 tokens (ej: f c b)
+                if (FLAG_POSITIONS.find(flagName) == FLAG_POSITIONS.end()) {
+                    auto nextTok2 = nextToken(sv);
+                    if (!nextTok2.empty() && nextTok2 != ")") {
+                        flagName += " " + std::string(nextTok2);
+                    }
+                }
+            }
+        }
+
+        if (FLAG_POSITIONS.find(flagName) != FLAG_POSITIONS.end()) {
+            try {
+                double dist = std::stod(std::string(nextToken(sv)));
+                double dir  = std::stod(std::string(nextToken(sv)));
+                Point absolutePos = FLAG_POSITIONS[flagName];
+                visibleFlags.push_back({flagName, dist, dir, true, absolutePos});
+            } catch (const std::invalid_argument&) {
+                continue; 
+            }
+        }
+    }
+
+    return visibleFlags;
+}
+
+// Función para obtener las dos flags más cercanas
+std::pair<FlagInfo, FlagInfo> getTwoClosestFlags(const std::string &see_msg) {
+    auto flags = parseVisibleFlags(see_msg);
+
+    if (flags.size() < 2) {
+        std::cerr << "No hay suficientes flags visibles para triangulación." << std::endl;
+        return {FlagInfo{}, FlagInfo{}};
+    }
+
+    // Ordenar por distancia ascendente
+    std::sort(flags.begin(), flags.end(), [](const FlagInfo &a, const FlagInfo &b) {
+        return a.dist < b.dist;
+    });
+
+    // Devolver las dos primeras
+    return {flags[0], flags[1]};
 }
 
 // ---------- FUNCIONES PARA ENVIAR COMANDOS ----------

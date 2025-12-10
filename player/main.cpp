@@ -74,6 +74,14 @@ int main(int argc, char *argv[])
         if (msg.rfind("(see", 0) == 0) {
             parseSeeMsg(msg, player);
             // std::cout << "[DEBUG] " << player.see << std::endl;
+            auto visibleFlags = parseVisibleFlags(msg);
+            auto [flag1, flag2] = getTwoClosestFlags(msg);
+
+            std::cout << "Flag1: " << flag1.name << " dist=" << flag1.dist << " dir=" << flag1.dir 
+              << " pos=(" << flag1.pos.x << "," << flag1.pos.y << ")" << std::endl;
+
+            std::cout << "Flag2: " << flag2.name << " dist=" << flag2.dist << " dir=" << flag2.dir 
+              << " pos=(" << flag2.pos.x << "," << flag2.pos.y << ")" << std::endl;
             shouldAct = true;  // Actuar después de recibir información visual
         } else if (msg.rfind("(sense_body", 0) == 0) {
             parseSenseMsg(msg, player);

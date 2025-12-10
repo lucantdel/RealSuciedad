@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <map>
 #include <MinimalSocket/udp/UdpSocket.h>
 #include <MinimalSocket/core/Address.h>
 
@@ -24,6 +25,16 @@ struct Point
     double x{0.0};
     double y{0.0};
 };
+
+struct FlagInfo {
+    std::string name;
+    double dist;
+    double dir;
+    bool visible;
+    Point pos; // coordenadas absolutas desde FLAG_POSITIONS
+};
+
+extern std::map<std::string, Point> FLAG_POSITIONS;
 
 std::ostream& operator<<(std::ostream& os, const Point& p);
 
@@ -92,6 +103,8 @@ bool parseObjectInfo(std::string_view msg,
 void parseInitMsg(const std::string &msg, PlayerInfo &player);
 void parseSeeMsg(const std::string &msg, PlayerInfo &player);
 void parseSenseMsg(const std::string &msg, PlayerInfo &player);
+std::vector<FlagInfo> parseVisibleFlags(const std::string &see_msg);
+std::pair<FlagInfo, FlagInfo> getTwoClosestFlags(const std::string &see_msg);
 
 void sendInitCommand(MinimalSocket::udp::Udp<true> &udp_socket,
                      const MinimalSocket::Address &server_udp,
