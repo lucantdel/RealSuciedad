@@ -7,7 +7,7 @@
 std::string receiveMsgFromServer(MinimalSocket::udp::Udp<true> &udp_socket, std::size_t message_max_size);
 
 // Envía un comando al servidor a través del socket UDP añadiendo un carácter nulo al final 
-// para evitar "(warning message_not_null_terminated)""
+// para evitar "(warning message_not_null_terminated)"
 void sendCommand(MinimalSocket::udp::Udp<true> &udp_socket, const MinimalSocket::Address &server_udp, const std::string &cmd);
 
 // Envía el comando de inicialización al servidor
