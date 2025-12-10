@@ -1,4 +1,5 @@
 #include "decisions.h"
+#include <cmath>
 
 std::string decideAction(const PlayerInfo &player)
 {
