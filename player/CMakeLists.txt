@@ -25,10 +25,14 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_deps/min_sock-src/build)
 
 # Set source files
 set(SOURCE_FILES
-    main.cpp 
+    main.cpp
+    funciones.cpp
 )
 
 add_executable(player ${SOURCE_FILES})
+
+# Incluye tu propio directorio para headers
+target_include_directories(player PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # LINK TO MinimalSocket
 target_link_libraries(player MinimalSocket)
