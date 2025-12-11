@@ -10,7 +10,7 @@
 #include <cmath>
 #include <map>
 
-// Definición real
+// Definición flags y sus posiciones absolutas en el campo
 std::map<std::string, Point> FLAG_POSITIONS = {
     {"f c",      {0, 0}},
     {"f c t",    {0, 34}},
@@ -19,7 +19,7 @@ std::map<std::string, Point> FLAG_POSITIONS = {
     {"f r b",    {52.5, -34}},
     {"f l t",    {-52.5, 34}},
     {"f l b",    {-52.5, -34}},
-    // Resto de flags...
+    // Resto de flags si queremos añadir...
 };
 
 // ---- IMPLEMENTACIONES DE OPERADORES ----
@@ -232,33 +232,41 @@ void parseSenseMsg(const std::string &msg, PlayerInfo &player)
 
 // Función para parsear las flags de un mensaje "see"
 std::vector<FlagInfo> parseVisibleFlags(const std::string &seeMsg) {
+
+    // Vector donde almacenaremos las flags visibles encontradas en el mensaje.
     std::vector<FlagInfo> visibleFlags;
     std::string_view sv = seeMsg;
 
     nextToken(sv); // Saltar "(see"
     nextToken(sv); // Saltar tiempo
 
+    // Recorremos el resto del mensaje hasta terminar.
     while (!sv.empty()) {
     auto tok = nextToken(sv);
-    if (tok.empty()) break;
+    if (tok.empty()) break; // Si ya no hay tokens, terminar.
 
-        // Detectar si es una flag (empieza con f o g o b)
-        std::string flagName(tok);
+        std::string flagName(tok);// Este string guardará el posible nombre de flag.
         if (tok == "f" || tok == "g" || tok == "b") {
-            // mirar siguiente token para completar nombre
-            auto nextTok = nextToken(sv);
+            
+            auto nextTok = nextToken(sv); // Leer siguiente token para completar el nombre.
+            
             if (!nextTok.empty() && nextTok != ")") {
+                
                 flagName += " " + std::string(nextTok);
-                // para flags de 3 tokens (ej: f c b)
+
+                // se intenta leer un tercer token (para flags como "f c b").
                 if (FLAG_POSITIONS.find(flagName) == FLAG_POSITIONS.end()) {
+
                     auto nextTok2 = nextToken(sv);
+
                     if (!nextTok2.empty() && nextTok2 != ")") {
                         flagName += " " + std::string(nextTok2);
                     }
                 }
             }
         }
-
+        // En este momento ya se tiene un nombre de flag potencialmente completo.
+        // Se verifica si realmente existe en el mapa predefinido FLAG_POSITIONS.
         if (FLAG_POSITIONS.find(flagName) != FLAG_POSITIONS.end()) {
             try {
                 double dist = std::stod(std::string(nextToken(sv)));
@@ -276,6 +284,8 @@ std::vector<FlagInfo> parseVisibleFlags(const std::string &seeMsg) {
 
 // Función para obtener las dos flags más cercanas
 std::pair<FlagInfo, FlagInfo> getTwoClosestFlags(const std::string &see_msg) {
+
+    // Primero se llama al parser de flags para obtener todas las flags visibles
     auto flags = parseVisibleFlags(see_msg);
 
     if (flags.size() < 2) {
@@ -283,7 +293,8 @@ std::pair<FlagInfo, FlagInfo> getTwoClosestFlags(const std::string &see_msg) {
         return {FlagInfo{}, FlagInfo{}};
     }
 
-    // Ordenar por distancia ascendente
+    // Ordenar por distancia ascendente: std::sort necesita tres cosas:
+    //inicio del rango a ordenar → flags.begin(). final del rango → flags.end() y Una función comparadora que indique “qué elemento va antes que cuál”.
     std::sort(flags.begin(), flags.end(), [](const FlagInfo &a, const FlagInfo &b) {
         return a.dist < b.dist;
     });
