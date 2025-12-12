@@ -60,6 +60,52 @@ std::map<std::string, Point> FLAG_POSITIONS = {
     {"f b r 30", { 30,-34}}
 };
 
+//Zona de cada jugador según su número
+Zona definirZonaJugador(int jugador_numero) {
+    Zona zona;
+
+    switch(jugador_numero) {
+        case 1:  // Portero
+            zona = { -52.5, -48, -7, 7 };
+            break;
+        case 2:  // Defensor 1
+            zona = { -36, -22, -10, 10 };
+            break;
+        case 3:  // Defensor 2
+            zona = { -52.5, -36, -10, 10 };
+            break;
+        case 4:  // Defensor 3
+            zona = { -36, -22, -20, 20 };
+            break;
+        case 5:  // Centrocampista 1
+            zona = { -22, 0, -20, 20 };
+            break;
+        case 6:  // Centrocampista 2
+            zona = { -22, 0, -10, 10 };
+            break;
+        case 7:  // Centrocampista 3
+            zona = { -22, 0, -10, 10 };
+            break;
+        case 8:  // Centrocampista 4
+            zona = { -22, 0, -20, 20 };
+            break;
+        case 9:  // Delantero 1
+            zona = { 0, 20, -5, 5 };
+            break;
+        case 10:  // Delantero 2
+            zona = { 0, 20, -10, 10 };
+            break;
+        case 11:  // Delantero 3
+            zona = { 0, 20, -5, 5 };
+            break;
+        default:
+            // Zona por defecto
+            zona = { -52.5, -36, -20, 20 };
+            break;
+    }
+
+    return zona;
+}
 // ---- IMPLEMENTACIONES DE OPERADORES ----
 
 std::ostream& operator<<(std::ostream& os, Side s)

@@ -89,8 +89,17 @@ int main(int argc, char *argv[])
             auto [px, py] = calcularPosicionJugador(parFlags);
             std::cout << "[POS ABS] x=" << px << " y=" << py << std::endl;
 
-            player.x_abs = px;
+            player.x_abs = px; //Almacenar esa información para accederla en algún momento posterior
             player.y_abs = py;
+
+            auto zona_jugador = definirZonaJugador(player.number);
+            if (px >= zona_jugador.x_min && px <= zona_jugador.x_max &&
+                py >= zona_jugador.y_min && py <= zona_jugador.y_max) {
+                std::cout << "Jugador " << player.number << " está dentro de su zona permitida." << std::endl;
+            } else {
+                std::cout << "Jugador " << player.number << " está fuera de su zona permitida." << std::endl;
+            }
+
             shouldAct = true;  // Actuar después de recibir información visual
         } else if (msg.rfind("(sense_body", 0) == 0) {
             parseSenseMsg(msg, player);

@@ -18,6 +18,10 @@ enum class Side
 
 std::ostream& operator<<(std::ostream& os, Side s);
 
+struct Zona {
+    double x_min, x_max, y_min, y_max;
+};
+
 
 // Coordenadas 2D en el campo
 struct Point
@@ -91,6 +95,7 @@ std::ostream& operator<<(std::ostream &os, const PlayerInfo &player);
 
 // --------------- PROTOTIPOS DE FUNCIÓN ------------------
 
+Zona definirZonaJugador(int jugador_numero);
 Point calcKickOffPosition(int unum);
 
 std::string receiveMsgFromServer(
