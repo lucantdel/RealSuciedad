@@ -1,7 +1,7 @@
 #include "decisions.h"
 #include <cmath>
 
-std::string decideAction(const PlayerInfo &player)
+std::string playOnDecision(const PlayerInfo &player)
 {
     std::string action_cmd;
 
@@ -27,14 +27,24 @@ std::string decideAction(const PlayerInfo &player)
             }
         } else {
             // Balón cerca: intentar chutar
-            if (player.see.opp_goal.visible) {
-                double kickDir = player.see.opp_goal.dir;
+            if (player.see.oppGoal.visible) {
+                double kickDir = player.see.oppGoal.dir;
                 action_cmd = "(kick 90 " + std::to_string(kickDir) + ")";
             } else {
                 // Si no ve la portería rival, girar para buscarla
                 action_cmd = "(turn 30)";
             }
+            // action_cmd = "(kick 90 0)";  // Chutar hacia adelante (para comprobar corners y saques de banda)
         }
     }
     return action_cmd;
+}
+
+std::string decideAction(const PlayerInfo &player, const GameState &gameState)
+{
+    if (gameState.playMode == PlayMode::PlayOn) {
+        return playOnDecision(player);
+    }
+    
+    return "";
 }

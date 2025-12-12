@@ -36,15 +36,6 @@ void sendInitCommand(MinimalSocket::udp::Udp<true> &udp_socket, const MinimalSoc
     std::cout << "Init message sent" << std::endl;
 }
 
-void sendEarCommand(MinimalSocket::udp::Udp<true> &udp_socket, const MinimalSocket::Address &server_udp)
-{
-    std::string hear_cmd = "(ear on)";
-    
-    std::cout << "Sending hear message: " << hear_cmd << std::endl;
-    sendCommand(udp_socket, server_udp, hear_cmd);
-    std::cout << "Hear message sent" << std::endl;
-}
-
 void sendMoveCommand(MinimalSocket::udp::Udp<true> &udp_socket, const MinimalSocket::Address &server_udp, PlayerInfo &player)
 {
     std::string move_cmd =

@@ -60,10 +60,11 @@ int main(int argc, char *argv[])
     // Parsear el mensaje de inicialización y configurar el jugador
     PlayerInfo player;
     player.team = team_name;
-    parseInitMsg(received_message_content, player);
-    std::cout << player << std::endl;
 
-    sendEarCommand(udp_socket, server_udp);
+    GameState game_state;
+
+    parseInitMsg(received_message_content, player, game_state);
+    std::cout << player << std::endl;
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
@@ -81,10 +82,14 @@ int main(int argc, char *argv[])
             shouldAct = true;  // Actuar después de recibir información visual
         } else if (msg.rfind("(sense_body", 0) == 0) {
             parseSenseMsg(msg, player);
-        } 
+            // std::cout << "[DEBUG] " << player.sense << std::endl;
+        } else if (msg.rfind("(hear", 0) == 0) {
+            parseHearMsg(msg, player, game_state);
+            // std::cout << "[DEBUG] " << game_state << std::endl;
+        }
 
         if (shouldAct) {
-            std::string action_cmd = decideAction(player);
+            std::string action_cmd = decideAction(player, game_state);
             if (!action_cmd.empty()) {
                 sendActionCommand(udp_socket, server_udp, action_cmd);
             }
