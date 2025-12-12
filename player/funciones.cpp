@@ -12,14 +12,52 @@
 
 // Definición flags y sus posiciones absolutas en el campo
 std::map<std::string, Point> FLAG_POSITIONS = {
-    {"f c",      {0, 0}},
-    {"f c t",    {0, 34}},
-    {"f c b",    {0, -34}},
-    {"f r t",    {52.5, 34}},
-    {"f r b",    {52.5, -34}},
-    {"f l t",    {-52.5, 34}},
-    {"f l b",    {-52.5, -34}},
-    // Resto de flags si queremos añadir...
+    // Corners
+    {"f l t", {-52.5, 34}},
+    {"f l b", {-52.5, -34}},
+    {"f r t", { 52.5, 34}},
+    {"f r b", { 52.5,-34}},
+
+    // Center line
+    {"f c", {0, 0}},
+    {"f c t", {0, 34}},
+    {"f c b", {0,-34}},
+
+    // Left line
+    {"f l 0", {-52.5, 0}},
+    {"f l t 10", {-52.5, 10}},
+    {"f l t 20", {-52.5, 20}},
+    {"f l t 30", {-52.5, 30}},
+    {"f l b 10", {-52.5, -10}},
+    {"f l b 20", {-52.5, -20}},
+    {"f l b 30", {-52.5, -30}},
+
+    // Right line
+    {"f r 0", {52.5, 0}},
+    {"f r t 10", {52.5, 10}},
+    {"f r t 20", {52.5, 20}},
+    {"f r t 30", {52.5, 30}},
+    {"f r b 10", {52.5, -10}},
+    {"f r b 20", {52.5, -20}},
+    {"f r b 30", {52.5, -30}},
+
+    // Top line
+    {"f t 0", {0,34}},
+    {"f t l 10", {-10, 34}},
+    {"f t l 20", {-20, 34}},
+    {"f t l 30", {-30, 34}},
+    {"f t r 10", { 10, 34}},
+    {"f t r 20", { 20, 34}},
+    {"f t r 30", { 30, 34}},
+
+    // Bottom line
+    {"f b 0", {0,-34}},
+    {"f b l 10", {-10,-34}},
+    {"f b l 20", {-20,-34}},
+    {"f b l 30", {-30,-34}},
+    {"f b r 10", { 10,-34}},
+    {"f b r 20", { 20,-34}},
+    {"f b r 30", { 30,-34}}
 };
 
 // ---- IMPLEMENTACIONES DE OPERADORES ----
@@ -231,76 +269,148 @@ void parseSenseMsg(const std::string &msg, PlayerInfo &player)
 }
 
 // Función para parsear las flags de un mensaje "see"
-std::vector<FlagInfo> parseVisibleFlags(const std::string &seeMsg) {
-
-    // Vector donde almacenaremos las flags visibles encontradas en el mensaje.
+std::vector<FlagInfo> parseVisibleFlags(const std::string &seeMsg)
+{
     std::vector<FlagInfo> visibleFlags;
-    std::string_view sv = seeMsg;
+    const std::string &s = seeMsg;
+    std::size_t start = 0;
+    const std::size_t N = s.size();
 
-    nextToken(sv); // Saltar "(see"
-    nextToken(sv); // Saltar tiempo
+    // Función auxiliar para eliminar los espacios en blanco al principio y al final de una cadena
+    auto trim = [](std::string &str){
+        std::size_t a = 0;
+        while (a < str.size() && std::isspace((unsigned char)str[a])) ++a; // Eliminar espacios al principio
+        std::size_t b = str.size();
+        while (b > a && std::isspace((unsigned char)str[b-1])) --b; // Eliminar espacios al final
+        str = str.substr(a, b-a);
+    };
 
-    // Recorremos el resto del mensaje hasta terminar.
-    while (!sv.empty()) {
-    auto tok = nextToken(sv);
-    if (tok.empty()) break; // Si ya no hay tokens, terminar.
+    // Bucle para recorrer todo el mensaje en busca de flags
+    while (start < N) {
+        // buscar la próxima ocurrencia de "(f" o "(g" o "(b"
+        std::size_t pos_f = s.find("(f", start);
+        std::size_t pos_g = s.find("(g", start);
+        std::size_t pos_b = s.find("(b", start);
 
-        std::string flagName(tok);// Este string guardará el posible nombre de flag.
-        if (tok == "f" || tok == "g" || tok == "b") {
-            
-            auto nextTok = nextToken(sv); // Leer siguiente token para completar el nombre.
-            
-            if (!nextTok.empty() && nextTok != ")") {
-                
-                flagName += " " + std::string(nextTok);
+        // Determinar cuál de las posiciones es la más cercana
+        std::size_t pos = std::string::npos;
+        if (pos_f != std::string::npos) pos = pos_f;
+        if (pos_g != std::string::npos && (pos == std::string::npos || pos_g < pos)) pos = pos_g;
+        if (pos_b != std::string::npos && (pos == std::string::npos || pos_b < pos)) pos = pos_b;
 
-                // se intenta leer un tercer token (para flags como "f c b").
-                if (FLAG_POSITIONS.find(flagName) == FLAG_POSITIONS.end()) {
+        // Si no se encuentran flags, salimos del bucle
+        if (pos == std::string::npos) break;
 
-                    auto nextTok2 = nextToken(sv);
+        // encontrar el cierre de ese paréntesis correspondiente (primer ')' tras pos)
+        std::size_t close = s.find(')', pos);
+        if (close == std::string::npos) break; // formato raro -> salir
 
-                    if (!nextTok2.empty() && nextTok2 != ")") {
-                        flagName += " " + std::string(nextTok2);
-                    }
-                }
+        // nombre entre '(' y ')', por ejemplo "f c" o "f t l 40"
+        std::string name = s.substr(pos + 1, close - (pos + 1)); // quitar '('
+        trim(name);
+
+        // validar nombre con FLAG_POSITIONS
+        if (FLAG_POSITIONS.find(name) != FLAG_POSITIONS.end()) {
+            // extraer números que siguen después de close
+            // tomamos una ventana corta a partir de close+1 para parsear dist y dir
+            std::size_t num_start = close + 1;
+            // aumentar la ventana si hace falta, pero limitarla para eficiencia
+            std::size_t len = std::min<std::size_t>(N - num_start, 128);
+            std::string tail = s.substr(num_start, len); // Extraer la parte del mensaje que contiene los números
+            std::istringstream iss(tail); // Convertir la parte extraída a un stream para parsear los números
+            double dist = 0.0, dir = 0.0;
+            // Si se pudieron leer correctamente los números de distancia y dirección
+            if ( (iss >> dist >> dir) ) {
+                FlagInfo fi;
+                fi.name = name;
+                fi.dist = dist;
+                fi.dir  = dir;
+                fi.visible = true;
+                fi.pos = FLAG_POSITIONS.at(name);
+                visibleFlags.push_back(fi);
             }
+            // si no se pudieron leer números, ignoramos esta ocurrencia
         }
-        // En este momento ya se tiene un nombre de flag potencialmente completo.
-        // Se verifica si realmente existe en el mapa predefinido FLAG_POSITIONS.
-        if (FLAG_POSITIONS.find(flagName) != FLAG_POSITIONS.end()) {
-            try {
-                double dist = std::stod(std::string(nextToken(sv)));
-                double dir  = std::stod(std::string(nextToken(sv)));
-                Point absolutePos = FLAG_POSITIONS[flagName];
-                visibleFlags.push_back({flagName, dist, dir, true, absolutePos});
-            } catch (const std::invalid_argument&) {
-                continue; 
-            }
-        }
+
+        // avanzar start para seguir buscando (evitar loops infinitos)
+        start = close + 1;
     }
 
     return visibleFlags;
 }
 
-// Función para obtener las dos flags más cercanas
-std::pair<FlagInfo, FlagInfo> getTwoClosestFlags(const std::string &see_msg) {
-
-    // Primero se llama al parser de flags para obtener todas las flags visibles
+// Función para obtener las dos mejores flags según la distancia y dirección
+std::pair<FlagInfo, FlagInfo> getTwoBestFlags(const std::string &see_msg)
+{
+    // Parseamos el mensaje "see_msg" para obtener todas las flags visibles
     auto flags = parseVisibleFlags(see_msg);
 
-    if (flags.size() < 2) {
-        std::cerr << "No hay suficientes flags visibles para triangulación." << std::endl;
+    if (flags.size() < 2)
         return {FlagInfo{}, FlagInfo{}};
+
+    // Eliminar duplicados: Si hay varias entradas de la misma flag, nos quedamos con la más cercana
+    std::map<std::string, FlagInfo> unique;
+    for (auto &f : flags)
+        // Si la flag no está en el mapa o tiene una distancia menor, la agregamos
+        if (!unique.count(f.name) || f.dist < unique[f.name].dist)
+            unique[f.name] = f;
+
+    // Convertimos las flags únicas en un vector
+    std::vector<FlagInfo> v;
+    for (auto &kv : unique)
+        v.push_back(kv.second);
+
+    if (v.size() < 2)
+        return {FlagInfo{}, FlagInfo{}};
+
+    // Inicializamos variables para encontrar las mejores dos flags
+    bool found = false;
+    double bestScore = 1e18;
+    FlagInfo bestA, bestB;
+
+    // Umbrales para filtrar distancias y ángulos pequeños
+    const double MIN_DIST = 0.001;
+    const double MIN_ANG  = 0.001;
+
+    // Comparamos todas las combinaciones posibles de flags para encontrar las mejores
+    for (size_t i = 0; i < v.size(); ++i) {
+        for (size_t j = i + 1; j < v.size(); ++j) {
+
+            const auto &A = v[i]; // Primera flag
+            const auto &B = v[j]; // Segunda flag
+
+            // Obtenemos las posiciones de las flags desde FLAG_POSITIONS
+            auto pA = FLAG_POSITIONS.at(A.name);
+            auto pB = FLAG_POSITIONS.at(B.name);
+
+            // Calculamos la distancia entre las dos flags y la separación angular
+            double dx = pB.x - pA.x;
+            double dy = pB.y - pA.y;
+            double baseLineDist = std::sqrt(dx*dx + dy*dy);
+            double angSep = std::fabs(A.dir - B.dir);
+
+            // Si las flags están demasiado cerca o casi en la misma dirección, las ignoramos
+            if (baseLineDist < 1.0) continue;   // evita flags casi juntas
+            if (angSep < 5.0) continue;         // evita flags casi en la misma dirección
+
+            // Calculamos una "puntuación" basada en la distancia y la separación angular
+            double score = (1.0 / (baseLineDist + MIN_DIST))
+                         + (1.0 / (angSep + MIN_ANG));
+
+            // Si encontramos una mejor puntuación (más baja), actualizamos las mejores flags
+            if (!found || score < bestScore) {
+                bestScore = score;
+                bestA = A;
+                bestB = B;
+                found = true;
+            }
+        }
     }
 
-    // Ordenar por distancia ascendente: std::sort necesita tres cosas:
-    //inicio del rango a ordenar → flags.begin(). final del rango → flags.end() y Una función comparadora que indique “qué elemento va antes que cuál”.
-    std::sort(flags.begin(), flags.end(), [](const FlagInfo &a, const FlagInfo &b) {
-        return a.dist < b.dist;
-    });
+    if (!found)
+        return {FlagInfo{}, FlagInfo{}};
 
-    // Devolver las dos primeras
-    return {flags[0], flags[1]};
+    return {bestA, bestB};
 }
 
 // ---------- FUNCIONES PARA ENVIAR COMANDOS ----------
@@ -333,6 +443,89 @@ void sendMoveCommand(PlayerInfo &player, MinimalSocket::udp::Udp<true> &udp_sock
     udp_socket.sendTo(move_cmd, server_udp);
     std::cout << "Move command sent" << std::endl;
 }
+
+// ---------- FUNCIONES DE OPERACIONES ----------
+
+std::vector<Point> corteCircunferencias(
+        float x1, float y1, float r1,
+        float x2, float y2, float r2)
+{
+    std::vector<Point> res; // Vector para almacenar los puntos de intersección.
+
+    // Calcular la distancia entre los centros de las circunferencias
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float d = std::sqrt(dx*dx + dy*dy);
+
+    // Si la distancia es mayor que la suma de los radios o menor que la diferencia absoluta
+    // entre los radios, o si las circunferencias están concéntricas (d == 0), no hay intersección válida.
+    if (d > r1 + r2 || d < std::fabs(r1 - r2) || d == 0) {
+        return res;
+    }
+
+    // Calcular los puntos de intersección
+    float a = (r1*r1 - r2*r2 + d*d) / (2*d);
+    float h = std::sqrt(r1*r1 - a*a); // Calculamos la distancia "h" que es la distancia entre el punto de intersección y el centro de cada circunferencia
+
+    // Punto medio entre los dos centros
+    float xm = x1 + a * dx / d;
+    float ym = y1 + a * dy / d;
+
+    // Calculamos las dos posibles intersecciones (puntos de intersección)
+    float xs1 = xm + h * dy / d;
+    float ys1 = ym - h * dx / d;
+    float xs2 = xm - h * dy / d;
+    float ys2 = ym + h * dx / d;
+
+    res.push_back({xs1, ys1});
+    res.push_back({xs2, ys2});
+    return res;
+}
+
+Point calcularPosicionJugador(const std::pair<FlagInfo,FlagInfo>& flags)
+{
+    const auto& f1 = flags.first;
+    const auto& f2 = flags.second;
+
+    // Se obtienen las coordenadas absolutas de cada flag desde tu mapa
+    Point p1 = FLAG_POSITIONS[f1.name];
+    Point p2 = FLAG_POSITIONS[f2.name];
+
+    float x1 = p1.x, y1 = p1.y; // Distancia desde el jugador a la primera flag
+    float x2 = p2.x, y2 = p2.y; // Distancia desde el jugador a la segunda flag
+
+    float r1 = f1.dist;
+    float r2 = f2.dist;
+
+    double dx = x2 - x1, dy = y2 - y1; // Distancia entre las dos flags
+    double d = std::sqrt(dx*dx + dy*dy);
+
+    std::cout << "[DEBUG] Centers: ("<<x1<<","<<y1<<") r1="<<r1
+            << " - ("<<x2<<","<<y2<<") r2="<<r2
+            << " ; d="<<d
+            << " ; r1+r2="<< (r1+r2)
+            << " ; |r1-r2|="<< std::fabs(r1-r2) << std::endl;
+
+    // Calcular intersección de las circunferencias
+    auto puntos = corteCircunferencias(x1, y1, r1, x2, y2, r2);
+
+    if (puntos.size() == 0) {
+        return {0,0};   // Si no hay intersección válida
+    }
+
+    // Se elige la que esté dentro del campo
+    auto& pA = puntos[0];
+    auto& pB = puntos[1];
+
+    bool Ainside = (std::fabs(pA.x) <= 57.5 && std::fabs(pA.y) <= 39); // Verifica si el punto A está dentro del campo
+    bool Binside = (std::fabs(pB.x) <= 57.5 && std::fabs(pB.y) <= 39); // Verifica si el punto B está dentro del campo
+
+    if (Ainside && !Binside) return pA; // Si A está dentro y B no, retornamos pA
+    if (!Ainside && Binside) return pB; // Si B está dentro y A no, retornamos pB
+
+    return pA;
+}
+
 
 // ---------- FUNCIONES DE DECISIÓN ----------
 

@@ -80,6 +80,11 @@ struct PlayerInfo
     SeeInfo see{};
     SenseInfo sense{};
     Point initialPosition{};  // Posición inicial asignada según el dorsal
+
+    // posición absoluta
+    float x_abs{0.0f};
+    float y_abs{0.0f};
+    float dir_abs{0.0f};
 };
 
 std::ostream& operator<<(std::ostream &os, const PlayerInfo &player);
@@ -104,7 +109,13 @@ void parseInitMsg(const std::string &msg, PlayerInfo &player);
 void parseSeeMsg(const std::string &msg, PlayerInfo &player);
 void parseSenseMsg(const std::string &msg, PlayerInfo &player);
 std::vector<FlagInfo> parseVisibleFlags(const std::string &see_msg);
-std::pair<FlagInfo, FlagInfo> getTwoClosestFlags(const std::string &see_msg);
+std::pair<FlagInfo, FlagInfo> getTwoBestFlags(const std::string &see_msg);
+
+std::vector<Point> corteCircunferencias(
+        float x1, float y1, float r1,
+        float x2, float y2, float r2);
+Point calcularPosicionJugador(const std::pair<FlagInfo,FlagInfo>& flags);
+
 
 void sendInitCommand(MinimalSocket::udp::Udp<true> &udp_socket,
                      const MinimalSocket::Address &server_udp,
