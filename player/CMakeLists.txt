@@ -25,7 +25,11 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/_deps/min_sock-src/build)
 
 # Set source files
 set(SOURCE_FILES
-    main.cpp 
+    main.cpp
+    parsers.cpp
+    positions.cpp
+    decisions.cpp
+    net.cpp
 )
 
 add_executable(player ${SOURCE_FILES})
